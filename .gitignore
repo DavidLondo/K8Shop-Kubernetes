@@ -1,0 +1,219 @@
+# ============================
+# 🌐 GENERAL / GLOBAL IGNORE
+# ============================
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.log
+*.tmp
+*.swp
+*.swo
+*.bak
+*.orig
+*.lock
+*.env
+.env.*
+!env.example
+.cache/
+tmp/
+temp/
+dist/
+build/
+node_modules/
+__pycache__/
+venv/
+.venv/
+*.py[cod]
+*.egg
+*.egg-info/
+pip-wheel-metadata/
+site-packages/
+
+# ============================
+# 🟢 NODE.JS SERVICES
+# ============================
+# Dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+.pnpm-store/
+
+# Builds
+.next/
+out/
+coverage/
+lib/
+logs/
+*.tsbuildinfo
+
+# ============================
+# 🐍 PYTHON SERVICES
+# ============================
+# Virtualenv
+.env/
+.venv/
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Byte-compiled
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Packaging
+build/
+develop-eggs/
+dist/
+eggs/
+*.egg-info/
+.installed.cfg
+*.manifest
+*.spec
+
+# Test and reports
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+.cache/
+
+# ============================
+# 🦫 GO SERVICES
+# ============================
+# Build artifacts
+bin/
+pkg/
+*.out
+*.test
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Go Modules
+vendor/
+go.sum
+go.work
+go.work.sum
+
+# ============================
+# ☁️ TERRAFORM
+# ============================
+# Local Terraform files
+.terraform/
+.terraform.lock.hcl
+terraform.tfstate
+terraform.tfstate.*
+crash.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+*.tfvars
+*.tfvars.json
+infra/terraform/terraform.tfvars
+# Secrets
+secrets.auto.tfvars
+# Plan files
+*.tfplan
+
+# ============================
+# 🐳 DOCKER / CONTAINERS
+# ============================
+# Docker artifacts
+**/Dockerfile~
+**/docker-compose*.yml~
+.docker/
+docker-compose.override.yml
+docker-compose.dev.yml
+.dockerignore
+
+# ============================
+# 🔧 OTHER TOOLS / SERVICES
+# ============================
+# Logs and temp data
+*.pid
+*.seed
+*.pid.lock
+npm-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Testing / coverage
+coverage/
+reports/
+report.xml
+lcov.info
+
+# ============================
+# 🔐 SECURITY / KEYS / CREDENTIALS
+# ============================
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+*.jks
+*.keystore
+*.kdbx
+*.bak
+secrets.json
+credentials.json
+config.local.json
+.env.local
+.env.production.local
+.env.development.local
+.env.test.local
+
+# ============================
+# 🧱 INFRASTRUCTURE / DEPLOYMENT
+# ============================
+# Kubernetes
+kubeconfig*
+*.yaml~
+*.yml~
+*.log
+*.bak
+*.retry
+
+# ============================
+# 🧰 MISC
+# ============================
+# Editor / OS Files
+.idea/
+.vscode/
+*.code-workspace
+*.sublime-workspace
+*.sublime-project
+*.iml
+*.db
+*.sqlite
+*.sqlite3
+*.rdb
+*.log
+
+# Archives
+*.zip
+*.tar.gz
+*.rar
+*.7z
+
+# ============================
+# ✅ CUSTOM PROJECTS (ADJUST HERE)
+# ============================
+# Example of ignoring service-specific build dirs
+services/*/build/
+services/*/node_modules/
+services/*/__pycache__/
+services/*/bin/

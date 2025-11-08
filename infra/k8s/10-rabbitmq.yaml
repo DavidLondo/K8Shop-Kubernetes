@@ -1,0 +1,95 @@
+# k8s/10-rabbitmq.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: rabbitmq
+  namespace: bookstore
+spec:
+  type: ClusterIP
+  selector: { app: rabbitmq }
+  ports:
+  - { name: amqp, port: 5672, targetPort: 5672 }
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: rabbitmq-conf
+  namespace: bookstore
+data:
+  rabbitmq.conf: |
+    loopback_users.guest = false
+    listeners.tcp.default = 5672
+    default_user = user
+    default_pass = password
+    # Quorum queue is default
+    queue_master_locator = min-masters
+  definitions.json: |
+    {
+      "users":[{"name":"user","password":"password","tags":"administrator"}],
+      "vhosts":[{"name":"/"}],
+      "permissions":[{"user":"user","vhost":"/","configure":".*","write":".*","read":".*"}],
+      "policies":[
+        {"vhost":"/","name":"ha-quorum","pattern":".*","apply-to":"queues",
+         "definition":{"queue-type":"quorum","delivery-limit":5,"dead-letter-exchange":"orders.dlq"},
+         "priority":0}
+      ],
+      "exchanges":[
+        {"name":"orders","vhost":"/","type":"topic","durable":true,"internal":false,"auto_delete":false},
+        {"name":"orders.dlq","vhost":"/","type":"topic","durable":true,"internal":false,"auto_delete":false}
+      ]
+    }
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata: { name: rabbitmq-pdb, namespace: bookstore }
+spec:
+  minAvailable: 2
+  selector: { matchLabels: { app: rabbitmq } }
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata: { name: rabbitmq, namespace: bookstore }
+spec:
+  serviceName: rabbitmq
+  replicas: 3
+  selector: { matchLabels: { app: rabbitmq } }
+  template:
+    metadata: { labels: { app: rabbitmq } }
+    spec:
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - topologyKey: topology.kubernetes.io/zone
+            labelSelector: { matchLabels: { app: rabbitmq } }
+      containers:
+      - name: rabbitmq
+        image: rabbitmq:3.13-management
+        ports: [ { containerPort: 5672, name: amqp } ]
+        volumeMounts:
+        - { name: data, mountPath: /var/lib/rabbitmq }
+        - { name: cfg,  mountPath: /etc/rabbitmq }
+        env:
+        - { name: RABBITMQ_USE_LONGNAME, value: "false" }
+        readinessProbe:
+          exec:
+            command: ["rabbitmq-diagnostics", "-q", "ping"]
+          initialDelaySeconds: 40
+          periodSeconds: 15
+          timeoutSeconds: 10
+          failureThreshold: 6
+        livenessProbe:
+          exec:
+            command: ["rabbitmq-diagnostics", "-q", "check_running"]
+          initialDelaySeconds: 90
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 6
+      volumes:
+      - name: data
+        emptyDir: {}
+      - name: cfg
+        configMap:
+          name: rabbitmq-conf
+          items:
+          - { key: rabbitmq.conf, path: rabbitmq.conf }
+          - { key: definitions.json, path: definitions.json }

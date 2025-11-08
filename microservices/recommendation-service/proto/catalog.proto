@@ -1,0 +1,31 @@
+syntax = "proto3";
+
+package catalog.v1;
+
+option go_package = "catalogv1";
+
+message GetProductRequest { string id = 1; }
+
+message Product {
+  string id = 1;
+  string sku = 2;
+  string title = 3;
+  double price = 4;
+  repeated string tags = 5;
+}
+
+message ListProductsRequest {
+  string q = 1;
+  string tag = 2;
+  double min = 3;
+  double max = 4;
+}
+
+message ListProductsResponse {
+  repeated Product items = 1;
+}
+
+service CatalogService {
+  rpc GetProduct(GetProductRequest) returns (Product);
+  rpc ListProducts(ListProductsRequest) returns (ListProductsResponse);
+}

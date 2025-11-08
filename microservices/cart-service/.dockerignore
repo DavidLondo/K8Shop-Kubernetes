@@ -1,0 +1,10 @@
+# Ignore local environment and build artifacts
+.env*
+__pycache__/
+.venv/
+*.pyc
+*.log
+.git
+.gitignore
+.vscode
+.DS_Store

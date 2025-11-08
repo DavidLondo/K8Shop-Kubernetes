@@ -1,0 +1,27 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: order, namespace: bookstore }
+spec:
+  replicas: 3
+  selector: { matchLabels: { app: order } }
+  template:
+    metadata: { labels: { app: order } }
+    spec:
+      containers:
+      - name: order
+        image: yourdockerhub/order:0.1.0
+        ports: [{ containerPort: 8080 }]
+        env:
+        - name: DB_HOST
+          valueFrom: { secretKeyRef: { name: datastore-secrets, key: DB_HOST } }
+        - name: DB_USER
+          valueFrom: { secretKeyRef: { name: datastore-secrets, key: DB_USER } }
+        - name: DB_PASS
+          valueFrom: { secretKeyRef: { name: datastore-secrets, key: DB_PASS } }
+        - name: DB_NAME
+          valueFrom: { configMapKeyRef: { name: datastore-config, key: DB_NAME } }
+        - name: RABBIT_URL
+          valueFrom: { configMapKeyRef: { name: datastore-config, key: RABBIT_URL } }
+        readinessProbe:
+          httpGet: { path: /healthz, port: 8080 }
+          initialDelaySeconds: 5

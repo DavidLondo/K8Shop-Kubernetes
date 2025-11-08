@@ -1,0 +1,14 @@
+# Ignore local environment and build artifacts
+.env*
+.git
+.gitignore
+node_modules
+.vscode
+.DS_Store
+__pycache__/
+.venv/
+*.log
+# Go build outputs
+/recommendation-service
+/build/
+/bin/

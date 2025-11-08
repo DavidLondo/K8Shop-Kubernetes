@@ -1,0 +1,51 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notification-service
+  labels:
+    app: notification-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: notification-service
+  template:
+    metadata:
+      labels:
+        app: notification-service
+    spec:
+      containers:
+      - name: notification
+        image: YOUR_REGISTRY/notification-service:latest
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: HOST
+          value: "0.0.0.0"
+        - name: PORT
+          value: "8080"
+        - name: NOTIF_CONSUME_ENABLED
+          value: "1"
+        - name: NOTIF_EXCHANGE
+          value: "orders"
+        - name: NOTIF_QUEUE_NAME
+          value: "notification-service"
+        - name: NOTIF_RABBIT_URL
+          value: "amqp://guest:guest@rabbitmq:5672/"
+        ports:
+        - containerPort: 8080
+          name: http
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: notification-service
+  labels:
+    app: notification-service
+spec:
+  selector:
+    app: notification-service
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+  type: ClusterIP
