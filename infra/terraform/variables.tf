@@ -24,76 +24,70 @@ variable "region" {
 
 variable "cluster_name" {
   type        = string
-  default     = "bookstore-eks"
-  description = "Friendly name for the EKS cluster."
+  default     = "bookstore-k8s"
+  description = "Friendly name used for tagging the vanilla Kubernetes cluster."
 }
 
 variable "admin_cidr_blocks" {
   type        = list(string)
   default     = ["0.0.0.0/0"]
-  description = "CIDR blocks allowed to reach the EKS public endpoint."
+  description = "CIDR blocks allowed to reach the Kubernetes API server and SSH."
 }
 
-variable "cluster_iam_role_arn" {
+variable "ssh_key_name" {
   type        = string
-  description = "Existing IAM role ARN to associate with the EKS control plane."
+  description = "Name of an existing EC2 Key Pair to attach to control plane and worker instances."
 }
 
-variable "node_type" {
+variable "ssh_private_key_path" {
+  type        = string
+  description = "Path to the private key file that matches ssh_key_name (used for automated kubeconfig retrieval)."
+}
+
+variable "local_kubeconfig_path" {
+  type        = string
+  default     = "~/.kube/bookstore-config"
+  description = "Local path where Terraform will store the kubeconfig for the vanilla cluster."
+}
+
+variable "control_plane_instance_type" {
+  type        = string
+  default     = "t3.medium"
+  description = "Instance type used for the Kubernetes control plane node."
+}
+
+variable "worker_instance_type" {
   type        = string
   default     = "t3.large"
-  description = "Instance type used by the EKS managed node group."
+  description = "Instance type used for worker nodes that run the application workloads."
 }
 
-variable "node_iam_role_arn" {
-  type        = string
-  description = "Existing IAM role ARN used by the EKS managed node group."
-}
-
-variable "desired" {
+variable "control_plane_root_volume_size" {
   type        = number
-  default     = 3
-  description = "Desired number of worker nodes for the EKS node group."
+  default     = 40
+  description = "Root EBS volume size (in GiB) for the control plane instance."
 }
 
-variable "min" {
+variable "worker_root_volume_size" {
   type        = number
-  default     = 3
-  description = "Minimum number of worker nodes for the EKS node group."
+  default     = 50
+  description = "Root EBS volume size (in GiB) for each worker node instance."
 }
 
-variable "max" {
+variable "worker_count" {
   type        = number
-  default     = 9
-  description = "Maximum number of worker nodes for the EKS node group."
+  default     = 2
+  description = "Number of worker nodes to provision in the EC2-based Kubernetes cluster."
 }
 
-variable "db_user" {
+variable "pod_network_cidr" {
   type        = string
-  description = "Master username for the PostgreSQL instance."
+  default     = "10.244.0.0/16"
+  description = "Pod network CIDR used when bootstrapping the cluster with kubeadm."
 }
 
-variable "db_password" {
+variable "service_cidr" {
   type        = string
-  description = "Master password for the PostgreSQL instance."
-  sensitive   = true
-}
-
-variable "db_name" {
-  type        = string
-  default     = "bookstore"
-  description = "Logical database name used by the application tier."
-}
-
-variable "rabbitmq_user" {
-  type        = string
-  default     = "user"
-  description = "Username used by application services when connecting to RabbitMQ inside the cluster."
-}
-
-variable "rabbitmq_password" {
-  type        = string
-  default     = "password"
-  description = "Password used by application services when connecting to RabbitMQ inside the cluster."
-  sensitive   = true
+  default     = "10.96.0.0/12"
+  description = "Service CIDR range passed to kubeadm for the in-cluster virtual IPs."
 }

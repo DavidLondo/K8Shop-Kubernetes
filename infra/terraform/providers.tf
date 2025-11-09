@@ -1,7 +1,8 @@
 terraform {
   required_version = ">= 1.5.0"
   required_providers {
-  aws = { source = "hashicorp/aws", version = "~> 5.0" }
+    aws    = { source = "hashicorp/aws", version = "~> 5.0" }
+    random = { source = "hashicorp/random", version = "~> 3.6" }
   }
 }
 provider "aws" {
@@ -10,3 +11,5 @@ provider "aws" {
   secret_key = var.secret_key
   token      = var.session_token
 }
+
+provider "random" {}
