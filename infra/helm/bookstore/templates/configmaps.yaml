@@ -1,0 +1,126 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: runtime-config
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: runtime-config
+data:
+  DB_HOST: "{{ .Values.runtimeConfig.dbHost }}"
+  DB_NAME: "{{ .Values.runtimeConfig.dbName }}"
+  RABBIT_URL: "{{ .Values.runtimeConfig.rabbitUrl }}"
+  NOTIF_RABBIT_URL: "{{ .Values.runtimeConfig.notificationRabbitUrl }}"
+  PAYMENT_RABBIT_URL: "{{ .Values.runtimeConfig.paymentRabbitUrl }}"
+  CART_REDIS_URL: "{{ .Values.runtimeConfig.cartRedisUrl }}"
+  CART_REDIS_SKIP_VERIFY: "1"
+  REDIS_HOST: "{{ .Values.runtimeConfig.redisHost }}"
+  DDB_TABLE: "{{ .Values.runtimeConfig.ddb.table }}"
+  DDB_ENDPOINT_URL: "{{ .Values.runtimeConfig.ddb.endpoint }}"
+  AWS_REGION: "{{ .Values.runtimeConfig.aws.region }}"
+  AWS_DEFAULT_REGION: "{{ .Values.runtimeConfig.aws.region }}"
+  AWS_ACCESS_KEY_ID: "{{ .Values.runtimeConfig.aws.accessKey }}"
+  AWS_SECRET_ACCESS_KEY: "{{ .Values.runtimeConfig.aws.secretKey }}"
+  PAYMENT_URL: "{{ .Values.runtimeConfig.payment.url }}"
+  PAYMENT_ENABLED: "{{ ternary "1" "0" .Values.runtimeConfig.payment.enabled }}"
+  PAYMENT_STRICT: "{{ ternary "1" "0" .Values.runtimeConfig.payment.strict }}"
+  INVENTORY_RABBIT_URL: "{{ .Values.runtimeConfig.rabbitUrl }}"
+  PG_DISABLE_SSL: "{{ ternary "true" "false" .Values.runtimeConfig.pgDisableSSL }}"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: catalog-service-config
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: catalog-service
+data:
+  HOST: "0.0.0.0"
+  PORT: "8080"
+  PG_DISABLE_SSL: "true"
+  CATALOG_GRPC_HOST: "0.0.0.0"
+  CATALOG_GRPC_PORT: "50051"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cart-service-config
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: cart-service
+data:
+  HOST: "0.0.0.0"
+  PORT: "8080"
+  CART_USE_REDIS: "1"
+  CART_REDIS_SKIP_VERIFY: "1"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: inventory-service-config
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: inventory-service
+data:
+  HOST: "0.0.0.0"
+  PORT: "8080"
+  INVENTORY_PUBLISH_ENABLED: "{{ ternary "1" "0" .Values.runtimeConfig.inventoryPublish.enabled }}"
+  INVENTORY_PUBLISH_STRICT: "{{ ternary "1" "0" .Values.runtimeConfig.inventoryPublish.strict }}"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: notification-service-config
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: notification-service
+data:
+  HOST: "0.0.0.0"
+  PORT: "8080"
+  NOTIF_CONSUME_ENABLED: "1"
+  NOTIF_EXCHANGE: "orders"
+  NOTIF_QUEUE_NAME: "notification-service"
+  NOTIF_RABBIT_URL: "{{ .Values.runtimeConfig.notificationRabbitUrl }}"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: order-service-config
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: order-service
+data:
+  HOST: "0.0.0.0"
+  PORT: "8000"
+  ORDER_PUBLISH_ENABLED: "1"
+  ORDER_PUBLISH_STRICT: "0"
+  ORDERS_EXCHANGE: "orders"
+  PAYMENT_ENABLED: "{{ ternary "1" "0" .Values.runtimeConfig.payment.enabled }}"
+  PAYMENT_STRICT: "{{ ternary "1" "0" .Values.runtimeConfig.payment.strict }}"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: payment-service-config
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: payment-service
+data:
+  HOST: "0.0.0.0"
+  PORT: "8080"
+  PAYMENT_PUBLISH_ENABLED: "1"
+  PAYMENT_PUBLISH_STRICT: "0"
+  PAYMENT_FAIL_PROB: "20"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: recommendation-service-config
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: recommendation-service
+data:
+  HOST: "0.0.0.0"
+  PORT: "8080"
+  REC_STRATEGY: "popular"
+  REC_LIMIT: "5"
+  CATALOG_GRPC_ADDR: "catalog-service.{{ .Release.Namespace }}.svc.cluster.local:50051"

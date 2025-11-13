@@ -1,0 +1,110 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: runtime-config
+  namespace: bookstore
+data:
+  DB_HOST: "postgresql.bookstore.svc.cluster.local"
+  DB_NAME: "bookstore"
+  RABBIT_URL: "amqp://user:password@rabbitmq.bookstore.svc.cluster.local:5672/"
+  NOTIF_RABBIT_URL: "amqp://user:password@rabbitmq.bookstore.svc.cluster.local:5672/"
+  PAYMENT_RABBIT_URL: "amqp://user:password@rabbitmq.bookstore.svc.cluster.local:5672/"
+  CART_REDIS_URL: "redis://redis.bookstore.svc.cluster.local:6379/0"
+  CART_REDIS_SKIP_VERIFY: "1"
+  REDIS_HOST: "redis.bookstore.svc.cluster.local"
+  DDB_TABLE: "bookstore_inventory"
+  DDB_ENDPOINT_URL: "http://dynamodb.bookstore.svc.cluster.local:8000"
+  AWS_REGION: "us-east-1"
+  AWS_DEFAULT_REGION: "us-east-1"
+  AWS_ACCESS_KEY_ID: "local"
+  AWS_SECRET_ACCESS_KEY: "local"
+  PAYMENT_URL: "http://payment-service.bookstore.svc.cluster.local:8080/payments"
+  PAYMENT_ENABLED: "1"
+  PAYMENT_STRICT: "0"
+  INVENTORY_RABBIT_URL: "amqp://user:password@rabbitmq.bookstore.svc.cluster.local:5672/"
+  PG_DISABLE_SSL: "true"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: catalog-service-config
+  namespace: bookstore
+data:
+  HOST: "0.0.0.0"
+  PORT: "8080"
+  PG_DISABLE_SSL: "true"
+  CATALOG_GRPC_HOST: "0.0.0.0"
+  CATALOG_GRPC_PORT: "50051"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cart-service-config
+  namespace: bookstore
+data:
+  HOST: "0.0.0.0"
+  PORT: "8080"
+  CART_USE_REDIS: "1"
+  CART_REDIS_SKIP_VERIFY: "1"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: inventory-service-config
+  namespace: bookstore
+data:
+  HOST: "0.0.0.0"
+  PORT: "8080"
+  INVENTORY_PUBLISH_ENABLED: "1"
+  INVENTORY_PUBLISH_STRICT: "0"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: notification-service-config
+  namespace: bookstore
+data:
+  HOST: "0.0.0.0"
+  PORT: "8080"
+  NOTIF_CONSUME_ENABLED: "1"
+  NOTIF_EXCHANGE: "orders"
+  NOTIF_QUEUE_NAME: "notification-service"
+  NOTIF_RABBIT_URL: "amqp://user:password@rabbitmq.bookstore.svc.cluster.local:5672/"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: order-service-config
+  namespace: bookstore
+data:
+  HOST: "0.0.0.0"
+  PORT: "8000"
+  ORDER_PUBLISH_ENABLED: "1"
+  ORDER_PUBLISH_STRICT: "0"
+  ORDERS_EXCHANGE: "orders"
+  PAYMENT_ENABLED: "1"
+  PAYMENT_STRICT: "0"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: payment-service-config
+  namespace: bookstore
+data:
+  HOST: "0.0.0.0"
+  PORT: "8080"
+  PAYMENT_PUBLISH_ENABLED: "1"
+  PAYMENT_PUBLISH_STRICT: "0"
+  PAYMENT_FAIL_PROB: "20"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: recommendation-service-config
+  namespace: bookstore
+data:
+  HOST: "0.0.0.0"
+  PORT: "8080"
+  REC_STRATEGY: "popular"
+  REC_LIMIT: "5"
+  CATALOG_GRPC_ADDR: "catalog-service.bookstore.svc.cluster.local:50051"

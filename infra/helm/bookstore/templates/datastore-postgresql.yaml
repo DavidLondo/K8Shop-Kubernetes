@@ -1,0 +1,121 @@
+{{- if .Values.datastores.postgresql.enabled -}}
+{{- $pg := .Values.credentials.postgres -}}
+{{- $schemasList := list -}}
+{{- range .Values.datastores.postgresql.schemas }}
+{{- $schemasList = append $schemasList (printf "'%s'" .) -}}
+{{- end -}}
+{{- $schemasArray := printf "ARRAY[%s]" (join "," $schemasList) -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-init-sql
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: postgresql
+data:
+  00-init.sql: |
+    DO $$
+    BEGIN
+      IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = '{{ $pg.application.username }}') THEN
+        CREATE ROLE {{ $pg.application.username }} LOGIN PASSWORD '{{ $pg.application.password }}';
+      ELSE
+        ALTER ROLE {{ $pg.application.username }} LOGIN PASSWORD '{{ $pg.application.password }}';
+      END IF;
+      ALTER ROLE {{ $pg.application.username }} SET search_path = public;
+    END $$;
+    \connect {{ $pg.superuser.database }};
+    DO $$
+    DECLARE
+      schema_name text;
+    BEGIN
+      FOR schema_name IN SELECT unnest({{ $schemasArray }})
+      LOOP
+        EXECUTE format('CREATE SCHEMA IF NOT EXISTS %I AUTHORIZATION {{ $pg.superuser.username }};', schema_name);
+        EXECUTE format('GRANT USAGE ON SCHEMA %I TO {{ $pg.application.username }};', schema_name);
+        EXECUTE format('GRANT CREATE ON SCHEMA %I TO {{ $pg.application.username }};', schema_name);
+        EXECUTE format('GRANT CREATE, SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA %I TO {{ $pg.application.username }};', schema_name);
+        EXECUTE format('ALTER DEFAULT PRIVILEGES IN SCHEMA %I GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO {{ $pg.application.username }};', schema_name);
+      END LOOP;
+    END $$;
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgresql
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: postgresql
+spec:
+  serviceName: postgresql
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgresql
+  template:
+    metadata:
+      labels:
+        app: postgresql
+    spec:
+      {{- with .Values.global.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.global.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.global.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: postgres
+          image: {{ .Values.datastores.postgresql.image }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          ports:
+            - containerPort: {{ .Values.datastores.postgresql.service.port }}
+              name: postgres
+          envFrom:
+            - secretRef:
+                name: postgres-credentials
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+            - name: init-sql
+              mountPath: /docker-entrypoint-initdb.d
+          resources: {{- toYaml .Values.datastores.postgresql.resources | nindent 12 }}
+      volumes:
+        - name: init-sql
+          configMap:
+            name: postgres-init-sql
+        {{- if not .Values.datastores.postgresql.persistence.enabled }}
+        - name: data
+          emptyDir: {}
+        {{- end }}
+  {{- if .Values.datastores.postgresql.persistence.enabled }}
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: {{ default "10Gi" .Values.datastores.postgresql.persistence.size }}
+  {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgresql
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: postgresql
+spec:
+  selector:
+    app: postgresql
+  ports:
+    - name: postgres
+      port: {{ .Values.datastores.postgresql.service.port }}
+      targetPort: {{ .Values.datastores.postgresql.service.port }}
+  type: ClusterIP
+{{- end }}

@@ -91,3 +91,9 @@ variable "service_cidr" {
   default     = "10.96.0.0/12"
   description = "Service CIDR range passed to kubeadm for the in-cluster virtual IPs."
 }
+
+variable "edge_proxy_node_port" {
+  type        = number
+  default     = 30080
+  description = "NodePort exposed by the edge proxy service inside the Kubernetes cluster."
+}

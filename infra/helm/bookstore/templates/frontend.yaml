@@ -1,8 +1,11 @@
+{{- if .Values.frontend.enabled }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: frontend-nginx
-  namespace: bookstore
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: frontend
 data:
   nginx.conf: |
     user  nginx;
@@ -48,7 +51,7 @@ data:
         }
 
         location = /api/catalog {
-          proxy_pass http://catalog-service.bookstore.svc.cluster.local/catalog;
+          proxy_pass http://catalog-service.{{ .Release.Namespace }}.svc.cluster.local/catalog;
           proxy_set_header Host $host;
           proxy_set_header X-Forwarded-For $remote_addr;
           proxy_set_header X-Request-Id $request_id;
@@ -56,7 +59,7 @@ data:
         }
 
         location /api/catalog/ {
-          proxy_pass http://catalog-service.bookstore.svc.cluster.local/catalog/;
+          proxy_pass http://catalog-service.{{ .Release.Namespace }}.svc.cluster.local/catalog/;
           proxy_set_header Host $host;
           proxy_set_header X-Forwarded-For $remote_addr;
           proxy_set_header X-Request-Id $request_id;
@@ -64,7 +67,7 @@ data:
         }
 
         location = /api/catalog/healthz {
-          proxy_pass http://catalog-service.bookstore.svc.cluster.local/healthz;
+          proxy_pass http://catalog-service.{{ .Release.Namespace }}.svc.cluster.local/healthz;
           proxy_set_header Host $host;
           proxy_set_header X-Forwarded-For $remote_addr;
           proxy_set_header X-Request-Id $request_id;
@@ -72,7 +75,7 @@ data:
         }
 
         location = /api/cart {
-          proxy_pass http://cart-service.bookstore.svc.cluster.local/cart;
+          proxy_pass http://cart-service.{{ .Release.Namespace }}.svc.cluster.local/cart;
           proxy_set_header Host $host;
           proxy_set_header X-Forwarded-For $remote_addr;
           proxy_set_header X-Request-Id $request_id;
@@ -80,7 +83,7 @@ data:
         }
 
         location /api/cart/ {
-          proxy_pass http://cart-service.bookstore.svc.cluster.local/cart/;
+          proxy_pass http://cart-service.{{ .Release.Namespace }}.svc.cluster.local/cart/;
           proxy_set_header Host $host;
           proxy_set_header X-Forwarded-For $remote_addr;
           proxy_set_header X-Request-Id $request_id;
@@ -88,7 +91,7 @@ data:
         }
 
         location = /api/cart/healthz {
-          proxy_pass http://cart-service.bookstore.svc.cluster.local/healthz;
+          proxy_pass http://cart-service.{{ .Release.Namespace }}.svc.cluster.local/healthz;
           proxy_set_header Host $host;
           proxy_set_header X-Forwarded-For $remote_addr;
           proxy_set_header X-Request-Id $request_id;
@@ -96,7 +99,7 @@ data:
         }
 
         location = /api/orders {
-          proxy_pass http://order-service.bookstore.svc.cluster.local/orders;
+          proxy_pass http://order-service.{{ .Release.Namespace }}.svc.cluster.local/orders;
           proxy_set_header Host $host;
           proxy_set_header X-Forwarded-For $remote_addr;
           proxy_set_header X-Request-Id $request_id;
@@ -104,7 +107,7 @@ data:
         }
 
         location /api/orders/ {
-          proxy_pass http://order-service.bookstore.svc.cluster.local/orders/;
+          proxy_pass http://order-service.{{ .Release.Namespace }}.svc.cluster.local/orders/;
           proxy_set_header Host $host;
           proxy_set_header X-Forwarded-For $remote_addr;
           proxy_set_header X-Request-Id $request_id;
@@ -112,7 +115,7 @@ data:
         }
 
         location = /api/orders/healthz {
-          proxy_pass http://order-service.bookstore.svc.cluster.local/healthz;
+          proxy_pass http://order-service.{{ .Release.Namespace }}.svc.cluster.local/healthz;
           proxy_set_header Host $host;
           proxy_set_header X-Forwarded-For $remote_addr;
           proxy_set_header X-Request-Id $request_id;
@@ -120,7 +123,7 @@ data:
         }
 
         location = /api/inventory/apply {
-          proxy_pass http://inventory-service.bookstore.svc.cluster.local:8080/inventory/apply;
+          proxy_pass http://inventory-service.{{ .Release.Namespace }}.svc.cluster.local:8080/inventory/apply;
           proxy_set_header Host $host;
           proxy_set_header X-Forwarded-For $remote_addr;
           proxy_set_header X-Request-Id $request_id;
@@ -129,7 +132,7 @@ data:
 
         location /api/inventory/ {
           rewrite ^/api/inventory/(.*)$ /inventory/$1 break;
-          proxy_pass http://inventory-service.bookstore.svc.cluster.local:8080;
+          proxy_pass http://inventory-service.{{ .Release.Namespace }}.svc.cluster.local:8080;
           proxy_set_header Host $host;
           proxy_set_header X-Forwarded-For $remote_addr;
           proxy_set_header X-Request-Id $request_id;
@@ -137,7 +140,7 @@ data:
         }
 
         location = /api/inventory/healthz {
-          proxy_pass http://inventory-service.bookstore.svc.cluster.local:8080/healthz;
+          proxy_pass http://inventory-service.{{ .Release.Namespace }}.svc.cluster.local:8080/healthz;
           proxy_set_header Host $host;
           proxy_set_header X-Forwarded-For $remote_addr;
           proxy_set_header X-Request-Id $request_id;
@@ -145,7 +148,7 @@ data:
         }
 
         location = /api/payments {
-          proxy_pass http://payment-service.bookstore.svc.cluster.local:8080/payments;
+          proxy_pass http://payment-service.{{ .Release.Namespace }}.svc.cluster.local:8080/payments;
           proxy_set_header Host $host;
           proxy_set_header X-Forwarded-For $remote_addr;
           proxy_set_header X-Request-Id $request_id;
@@ -153,7 +156,7 @@ data:
         }
 
         location = /api/payment/healthz {
-          proxy_pass http://payment-service.bookstore.svc.cluster.local:8080/healthz;
+          proxy_pass http://payment-service.{{ .Release.Namespace }}.svc.cluster.local:8080/healthz;
           proxy_set_header Host $host;
           proxy_set_header X-Forwarded-For $remote_addr;
           proxy_set_header X-Request-Id $request_id;
@@ -161,7 +164,7 @@ data:
         }
 
         location = /api/notification/notify {
-          proxy_pass http://notification-service.bookstore.svc.cluster.local:8080/notify;
+          proxy_pass http://notification-service.{{ .Release.Namespace }}.svc.cluster.local:8080/notify;
           proxy_set_header Host $host;
           proxy_set_header X-Forwarded-For $remote_addr;
           proxy_set_header X-Request-Id $request_id;
@@ -169,7 +172,7 @@ data:
         }
 
         location = /api/notification/healthz {
-          proxy_pass http://notification-service.bookstore.svc.cluster.local:8080/healthz;
+          proxy_pass http://notification-service.{{ .Release.Namespace }}.svc.cluster.local:8080/healthz;
           proxy_set_header Host $host;
           proxy_set_header X-Forwarded-For $remote_addr;
           proxy_set_header X-Request-Id $request_id;
@@ -177,7 +180,7 @@ data:
         }
 
         location = /api/recommendations {
-          proxy_pass http://recommendation-service.bookstore.svc.cluster.local:8080/recommendations;
+          proxy_pass http://recommendation-service.{{ .Release.Namespace }}.svc.cluster.local:8080/recommendations;
           proxy_set_header Host $host;
           proxy_set_header X-Forwarded-For $remote_addr;
           proxy_set_header X-Request-Id $request_id;
@@ -186,7 +189,7 @@ data:
 
         location /api/recommendations/ {
           rewrite ^/api/recommendations/(.*)$ /recommendations/$1 break;
-          proxy_pass http://recommendation-service.bookstore.svc.cluster.local:8080;
+          proxy_pass http://recommendation-service.{{ .Release.Namespace }}.svc.cluster.local:8080;
           proxy_set_header Host $host;
           proxy_set_header X-Forwarded-For $remote_addr;
           proxy_set_header X-Request-Id $request_id;
@@ -194,7 +197,7 @@ data:
         }
 
         location = /api/recommendations/healthz {
-          proxy_pass http://recommendation-service.bookstore.svc.cluster.local:8080/healthz;
+          proxy_pass http://recommendation-service.{{ .Release.Namespace }}.svc.cluster.local:8080/healthz;
           proxy_set_header Host $host;
           proxy_set_header X-Forwarded-For $remote_addr;
           proxy_set_header X-Request-Id $request_id;
@@ -207,9 +210,11 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: frontend
-  namespace: bookstore
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: frontend
 spec:
-  replicas: 2
+  replicas: {{ .Values.frontend.replicas }}
   strategy:
     rollingUpdate:
       maxUnavailable: 0
@@ -222,63 +227,65 @@ spec:
       labels:
         app: frontend
     spec:
+      {{- with .Values.global.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.global.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       topologySpreadConstraints:
-      - maxSkew: 1
-        topologyKey: topology.kubernetes.io/zone
-        whenUnsatisfiable: DoNotSchedule
-        labelSelector:
-          matchLabels:
-            app: frontend
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: DoNotSchedule
+          labelSelector:
+            matchLabels:
+              app: frontend
       affinity:
         podAntiAffinity:
           preferredDuringSchedulingIgnoredDuringExecution:
-          - weight: 100
-            podAffinityTerm:
-              topologyKey: kubernetes.io/hostname
-              labelSelector:
-                matchLabels:
-                  app: frontend
+            - weight: 100
+              podAffinityTerm:
+                topologyKey: kubernetes.io/hostname
+                labelSelector:
+                  matchLabels:
+                    app: frontend
       containers:
-      - name: frontend
-        image: davidlondo/frontend-bookstore:v20251108
-        imagePullPolicy: Always
-        ports:
-        - containerPort: 80
-          name: http
-        volumeMounts:
-        - name: nginx-config
-          mountPath: /etc/nginx/nginx.conf
-          subPath: nginx.conf
-        readinessProbe:
-          httpGet:
-            path: /healthz
-            port: 80
-          initialDelaySeconds: 5
-        livenessProbe:
-          httpGet:
-            path: /healthz
-            port: 80
-          initialDelaySeconds: 10
-        resources:
-          requests:
-            cpu: 50m
-            memory: 64Mi
-          limits:
-            cpu: 500m
-            memory: 256Mi
+        - name: frontend
+          image: {{ .Values.frontend.image }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          ports:
+            - containerPort: 80
+              name: http
+          volumeMounts:
+            - name: nginx-config
+              mountPath: /etc/nginx/nginx.conf
+              subPath: nginx.conf
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 80
+            initialDelaySeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 80
+            initialDelaySeconds: 10
+          resources: {{- toYaml .Values.frontend.resources | nindent 12 }}
       volumes:
-      - name: nginx-config
-        configMap:
-          name: frontend-nginx
-          items:
-          - key: nginx.conf
-            path: nginx.conf
+        - name: nginx-config
+          configMap:
+            name: frontend-nginx
+            items:
+              - key: nginx.conf
+                path: nginx.conf
 ---
 apiVersion: v1
 kind: Service
 metadata:
   name: frontend
-  namespace: bookstore
+  namespace: {{ .Release.Namespace }}
   labels:
     app: frontend
 spec:
@@ -286,17 +293,20 @@ spec:
     app: frontend
   type: ClusterIP
   ports:
-  - name: http
-    port: 80
-    targetPort: 80
+    - name: http
+      port: 80
+      targetPort: 80
 ---
 apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
   name: frontend-pdb
-  namespace: bookstore
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: frontend
 spec:
-  minAvailable: 1
+  minAvailable: {{ .Values.pdb.frontendMinAvailable }}
   selector:
     matchLabels:
       app: frontend
+{{- end }}

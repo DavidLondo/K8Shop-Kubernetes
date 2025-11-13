@@ -1,0 +1,175 @@
+nameOverride: ""
+fullnameOverride: ""
+
+imagePullSecrets: []
+
+serviceAccount:
+  create: false
+  name: ""
+
+global:
+  imagePullPolicy: IfNotPresent
+  commonLabels: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+networkPolicy:
+  defaultDeny: true
+  allowEdgeIngress:
+    enabled: true
+    cidrs:
+      - 0.0.0.0/0
+  allowNamespaceInternal: true
+
+credentials:
+  postgres:
+    superuser:
+      username: postgres
+      password: postgrespass
+      database: bookstore
+    application:
+      username: bookstore_app
+      password: bookstore_pass
+
+runtimeConfig:
+  dbHost: postgresql.bookstore.svc.cluster.local
+  dbName: bookstore
+  rabbitUrl: amqp://user:password@rabbitmq.bookstore.svc.cluster.local:5672/
+  notificationRabbitUrl: amqp://user:password@rabbitmq.bookstore.svc.cluster.local:5672/
+  paymentRabbitUrl: amqp://user:password@rabbitmq.bookstore.svc.cluster.local:5672/
+  cartRedisUrl: redis://redis.bookstore.svc.cluster.local:6379/0
+  redisHost: redis.bookstore.svc.cluster.local
+  ddb:
+    table: bookstore_inventory
+    endpoint: http://dynamodb.bookstore.svc.cluster.local:8000
+  aws:
+    region: us-east-1
+    accessKey: local
+    secretKey: local
+  payment:
+    url: http://payment-service.bookstore.svc.cluster.local:8080/payments
+    enabled: true
+    strict: false
+  inventoryPublish:
+    enabled: true
+    strict: false
+  pgDisableSSL: true
+
+datastores:
+  postgresql:
+    enabled: true
+    image: postgres:16-alpine
+    service:
+      port: 5432
+    resources: {}
+    persistence:
+      enabled: false
+    schemas:
+      - catalog
+      - cart
+      - inventory
+      - order
+      - payment
+      - recommendation
+    secretMappings:
+      - name: catalog-service-db
+        schema: catalog
+      - name: cart-service-db
+        schema: cart
+      - name: inventory-service-db
+        schema: inventory
+      - name: order-service-db
+        schema: order
+      - name: payment-service-db
+        schema: payment
+      - name: recommendation-service-db
+        schema: recommendation
+  redis:
+    enabled: true
+    image: redis:7.4-alpine
+    service:
+      port: 6379
+    resources: {}
+    persistence:
+      enabled: false
+  dynamodb:
+    enabled: true
+    image: amazon/dynamodb-local:latest
+    service:
+      port: 8000
+    resources: {}
+
+rabbitmq:
+  enabled: true
+  image: rabbitmq:3.13-management
+  replicas: 2
+  resources: {}
+  persistence:
+    enabled: false
+  pdb:
+    minAvailable: 1
+
+frontend:
+  enabled: true
+  image: davidlondo/frontend-bookstore:v20251108
+  replicas: 2
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+
+edgeProxy:
+  enabled: true
+  image: nginx:1.27-alpine
+  replicas: 2
+  nodePort: 30080
+  resources: {}
+
+services:
+  cart:
+    enabled: true
+    image: davidlondo/cart-service:latest
+    replicas: 2
+    resources: {}
+  catalog:
+    enabled: true
+    image: davidlondo/catalog-service:latest
+    replicas: 2
+    resources: {}
+  inventory:
+    enabled: true
+    image: davidlondo/inventory-service:v20251108
+    replicas: 2
+    resources: {}
+  notification:
+    enabled: true
+    image: davidlondo/notification-service:latest
+    replicas: 2
+    resources: {}
+  order:
+    enabled: true
+    image: davidlondo/order-service:latest
+    replicas: 2
+    resources: {}
+  payment:
+    enabled: true
+    image: davidlondo/payment-service:latest
+    replicas: 2
+    resources: {}
+  recommendation:
+    enabled: true
+    image: davidlondo/recommendation-service:latest
+    replicas: 2
+    resources: {}
+
+hpa:
+  cpuAverageUtilization: 60
+  maxReplicas: 10
+
+pdb:
+  frontendMinAvailable: 1
+  servicesMinAvailable: 2

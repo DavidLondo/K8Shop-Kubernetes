@@ -45,8 +45,23 @@ output "kubeadm_token" {
 }
 
 output "edge_proxy_node_port" {
-  value       = 30080
+  value       = var.edge_proxy_node_port
   description = "NodePort used by the edge proxy service (HTTP)."
+}
+
+output "edge_proxy_load_balancer_arn" {
+  value       = aws_lb.edge_proxy.arn
+  description = "ARN of the public Network Load Balancer exposing the edge proxy."
+}
+
+output "edge_proxy_load_balancer_dns" {
+  value       = aws_lb.edge_proxy.dns_name
+  description = "Public DNS name of the Network Load Balancer that fronts the edge proxy."
+}
+
+output "edge_proxy_load_balancer_zone_id" {
+  value       = aws_lb.edge_proxy.zone_id
+  description = "Hosted zone ID for Route53 alias records pointing to the load balancer."
 }
 
 output "kubeconfig_path" {

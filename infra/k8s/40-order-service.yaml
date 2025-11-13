@@ -4,7 +4,7 @@ metadata:
   name: order-service
   namespace: bookstore
 spec:
-  replicas: 3
+  replicas: 2
   strategy:
     rollingUpdate:
       maxUnavailable: 0
@@ -78,7 +78,7 @@ spec:
     apiVersion: apps/v1
     kind: Deployment
     name: order-service
-  minReplicas: 3
+  minReplicas: 2
   maxReplicas: 10
   metrics:
   - type: Resource
@@ -87,3 +87,21 @@ spec:
       target:
         type: Utilization
         averageUtilization: 60
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: order-service
+  namespace: bookstore
+  labels:
+    app: order-service
+spec:
+  selector:
+    app: order-service
+  ports:
+  - name: http
+    port: 8000
+    targetPort: 8000
+    appProtocol: http
+  type: ClusterIP

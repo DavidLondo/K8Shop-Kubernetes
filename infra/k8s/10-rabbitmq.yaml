@@ -43,7 +43,7 @@ apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata: { name: rabbitmq-pdb, namespace: bookstore }
 spec:
-  minAvailable: 2
+  minAvailable: 1
   selector: { matchLabels: { app: rabbitmq } }
 ---
 apiVersion: apps/v1
@@ -51,7 +51,7 @@ kind: StatefulSet
 metadata: { name: rabbitmq, namespace: bookstore }
 spec:
   serviceName: rabbitmq
-  replicas: 3
+  replicas: 2
   selector: { matchLabels: { app: rabbitmq } }
   template:
     metadata: { labels: { app: rabbitmq } }

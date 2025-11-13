@@ -72,14 +72,14 @@ export default function App() {
           name: "Carrito",
           endpoint: buildPath(cartApi, "/cart"),
           healthUrl: buildPath(cartApi, "/cart/healthz"),
-          description: "FastAPI + Redis TLS (cart-service)",
+          description: "FastAPI + Redis StatefulSet (cart-service)",
         },
         {
           key: "orders",
           name: "Órdenes",
           endpoint: buildPath(orderApi, "/orders"),
           healthUrl: buildPath(orderApi, "/orders/healthz"),
-          description: "FastAPI + DynamoDB/RDS (order-service)",
+          description: "FastAPI + RabbitMQ (order-service)",
         },
         {
           key: "inventory",
@@ -613,7 +613,7 @@ export default function App() {
               <div className="panel__head">
                 <div>
                   <h3>Carrito de {DEFAULT_USER}</h3>
-                  <p>Datos almacenados en ElastiCache Redis con TLS.</p>
+                  <p>Datos almacenados en Redis desplegado dentro del clúster.</p>
                 </div>
                 <button
                   type="button"

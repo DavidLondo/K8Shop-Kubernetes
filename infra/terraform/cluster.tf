@@ -59,6 +59,14 @@ resource "aws_security_group" "k8s_nodes" {
   }
 
   ingress {
+    description = "Public HTTP edge proxy"
+    from_port   = var.edge_proxy_node_port
+    to_port     = var.edge_proxy_node_port
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
     description = "Intra-cluster traffic"
     from_port   = 0
     to_port     = 0

@@ -1,0 +1,161 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: edge-proxy-config
+  namespace: bookstore
+data:
+  nginx.conf: |
+    user  nginx;
+    worker_processes  auto;
+
+    error_log  /var/log/nginx/error.log warn;
+    pid        /var/run/nginx.pid;
+
+    events {
+      worker_connections  1024;
+    }
+
+    http {
+      include       /etc/nginx/mime.types;
+      default_type  application/octet-stream;
+      sendfile        on;
+      keepalive_timeout  65;
+      gzip on;
+      proxy_http_version 1.1;
+      proxy_set_header Host $host;
+      proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+      proxy_set_header X-Forwarded-Proto $scheme;
+
+      upstream frontend_upstream {
+        server frontend.bookstore.svc.cluster.local:80;
+      }
+
+      upstream catalog_upstream {
+        server catalog-service.bookstore.svc.cluster.local:8080;
+      }
+
+      upstream cart_upstream {
+        server cart-service.bookstore.svc.cluster.local:8080;
+      }
+
+      upstream order_upstream {
+        server order-service.bookstore.svc.cluster.local:8000;
+      }
+
+      upstream recommendation_upstream {
+        server recommendation-service.bookstore.svc.cluster.local:8080;
+      }
+
+      upstream inventory_upstream {
+        server inventory-service.bookstore.svc.cluster.local:8080;
+      }
+
+      upstream payment_upstream {
+        server payment-service.bookstore.svc.cluster.local:8080;
+      }
+
+      upstream notification_upstream {
+        server notification-service.bookstore.svc.cluster.local:8080;
+      }
+
+      server {
+        listen       80;
+        server_name  _;
+
+        location = /healthz {
+          access_log off;
+          return 200 '{"ok":true}';
+          add_header Content-Type application/json;
+        }
+
+        location ~ ^/api/catalog(?<suffix>/?.*)$ {
+          proxy_pass http://catalog_upstream/catalog$suffix;
+        }
+
+        location ~ ^/api/cart(?<suffix>/?.*)$ {
+          proxy_pass http://cart_upstream/cart$suffix;
+        }
+
+        location ~ ^/api/orders(?<suffix>/?.*)$ {
+          proxy_pass http://order_upstream/orders$suffix;
+        }
+
+        location ~ ^/api/recommendations(?<suffix>/?.*)$ {
+          proxy_pass http://recommendation_upstream/recommendations$suffix;
+        }
+
+        location ~ ^/api/inventory(?<suffix>/?.*)$ {
+          proxy_pass http://inventory_upstream/inventory$suffix;
+        }
+
+        location ~ ^/api/payments(?<suffix>/?.*)$ {
+          proxy_pass http://payment_upstream/payments$suffix;
+        }
+
+        location ~ ^/api/notification(?<suffix>/?.*)$ {
+          proxy_pass http://notification_upstream/notification$suffix;
+        }
+
+        # Default fallback proxies root site
+        location / {
+          proxy_pass http://frontend_upstream/;
+        }
+      }
+    }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: edge-proxy
+  namespace: bookstore
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: edge-proxy
+  template:
+    metadata:
+      labels:
+        app: edge-proxy
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:1.27-alpine
+        ports:
+        - containerPort: 80
+          name: http
+        volumeMounts:
+        - name: config
+          mountPath: /etc/nginx/nginx.conf
+          subPath: nginx.conf
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: 80
+          initialDelaySeconds: 5
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 80
+          initialDelaySeconds: 10
+      volumes:
+      - name: config
+        configMap:
+          name: edge-proxy-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: edge-proxy
+  namespace: bookstore
+  labels:
+    app: edge-proxy
+spec:
+  selector:
+    app: edge-proxy
+  type: NodePort
+  ports:
+  - name: http
+    port: 80
+    targetPort: 80
+    nodePort: 30080

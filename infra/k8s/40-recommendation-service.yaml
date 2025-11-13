@@ -4,7 +4,7 @@ metadata:
   name: recommendation-service
   namespace: bookstore
 spec:
-  replicas: 3
+  replicas: 2
   strategy:
     rollingUpdate:
       maxUnavailable: 0
@@ -79,7 +79,7 @@ spec:
     apiVersion: apps/v1
     kind: Deployment
     name: recommendation-service
-  minReplicas: 3
+  minReplicas: 2
   maxReplicas: 10
   metrics:
   - type: Resource

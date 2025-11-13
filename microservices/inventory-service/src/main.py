@@ -1,9 +1,11 @@
+import copy
 import json
 import logging
 import os
 from collections import defaultdict
 from datetime import datetime, timezone
-from typing import Dict, List, Optional
+from decimal import Decimal, InvalidOperation
+from typing import Dict, List, Optional, Tuple
 from urllib import error as urlerror
 from urllib import request as urlrequest
 
@@ -20,7 +22,12 @@ try:
     from botocore.exceptions import BotoCoreError, ClientError  # type: ignore
 except Exception:  # pragma: no cover - boto3 always available in cluster image
     boto3 = None
-    BotoCoreError = ClientError = Exception
+
+    class BotoCoreError(Exception):
+        """Fallback boto core error."""
+
+    class ClientError(Exception):
+        """Fallback client error."""
 
 try:
     import pika  # type: ignore
@@ -151,10 +158,114 @@ class InMemoryInventoryStore(InventoryStore):
 
 class DynamoInventoryStore(InventoryStore):
     backend = "dynamodb"
+    MAX_TRANSACT_ATTEMPTS = 3
 
     def __init__(self, table):
         self.table = table
         self.client = table.meta.client
+
+    @staticmethod
+    def _coerce_numeric(value: object) -> int:
+        """Convert a DynamoDB scalar into an int, handling Decimals safely."""
+        if isinstance(value, Decimal):
+            return int(value)
+        if isinstance(value, (int, float)):
+            return int(Decimal(str(value)))
+        if isinstance(value, str):
+            try:
+                return int(Decimal(value))
+            except (InvalidOperation, ValueError) as exc:
+                raise InventoryStoreError(f"invalid numeric value '{value}'") from exc
+        raise InventoryStoreError(f"unsupported numeric type {type(value)!r}")
+
+    def _resolve_numeric(self, attr: object) -> Optional[int]:
+        """Walk a DynamoDB attribute and extract an integer stock figure."""
+        if isinstance(attr, (int, float, Decimal, str)):
+            try:
+                return self._coerce_numeric(attr)
+            except InventoryStoreError:
+                return None
+        if isinstance(attr, dict):
+            if "N" in attr:
+                return self._resolve_numeric(attr["N"])
+            if "S" in attr:
+                return self._resolve_numeric(attr["S"])
+            if "M" in attr:
+                return self._resolve_numeric(attr["M"])
+            if "L" in attr:
+                return self._resolve_numeric(attr["L"])
+            for value in attr.values():
+                resolved = self._resolve_numeric(value)
+                if resolved is not None:
+                    return resolved
+            return None
+        if isinstance(attr, list):
+            for value in attr:
+                resolved = self._resolve_numeric(value)
+                if resolved is not None:
+                    return resolved
+            return None
+        return None
+
+    def _extract_stock(self, attr: object) -> int:
+        resolved = self._resolve_numeric(attr)
+        if resolved is None:
+            raise InventoryStoreError("stock attribute has unexpected structure")
+        return resolved
+
+    def _fetch_current_stock(self, sku: str) -> Tuple[int, Dict[str, object]]:
+        try:
+            response = self.client.get_item(
+                TableName=self.table.name,
+                Key={"sku": {"S": sku}},
+                ProjectionExpression="#stock",
+                ExpressionAttributeNames={"#stock": "stock"},
+                ConsistentRead=True,
+            )
+        except ClientError as exc:
+            raise InventoryStoreError(f"get_item failed for {sku}: {exc}") from exc
+        except BotoCoreError as exc:
+            raise InventoryStoreError(f"get_item transport failure for {sku}: {exc}") from exc
+
+        item = response.get("Item")
+        if not item or "stock" not in item:
+            raise OutOfStockError(f"sku {sku} not found in inventory")
+
+        stock_attr = item["stock"]
+        try:
+            available = self._extract_stock(stock_attr)
+        except InventoryStoreError as exc:
+            raise InventoryStoreError(f"sku {sku} has invalid stock attribute") from exc
+
+        return available, stock_attr
+
+    def _prepare_transact_items(self, items: Dict[str, int], timestamp: str) -> List[dict]:
+        operations: List[dict] = []
+        for sku, qty in items.items():
+            if qty <= 0:
+                continue
+            available, expected_attr = self._fetch_current_stock(sku)
+            if qty > available:
+                raise OutOfStockError(f"requested quantity exceeds available stock for {sku}")
+
+            new_stock = available - qty
+            operations.append({
+                "Update": {
+                    "TableName": self.table.name,
+                    "Key": {"sku": {"S": sku}},
+                    "UpdateExpression": "SET #stock = :new_stock, updated_at = :ts",
+                    "ConditionExpression": "#stock = :expected",
+                    "ExpressionAttributeNames": {
+                        "#stock": "stock",
+                    },
+                    "ExpressionAttributeValues": {
+                        ":new_stock": {"N": str(new_stock)},
+                        ":expected": copy.deepcopy(expected_attr),
+                        ":ts": {"S": timestamp},
+                    },
+                }
+            })
+        return operations
 
     def ping(self) -> None:
         global DESCRIBE_WARNING_EMITTED
@@ -181,46 +292,34 @@ class DynamoInventoryStore(InventoryStore):
         if len(items) > 25:
             raise InventoryStoreError("DynamoDB transaction limit exceeded (max 25 unique SKUs per order)")
 
-        now = datetime.now(timezone.utc).isoformat()
-        transact_items = []
-        for sku, qty in items.items():
-            if qty <= 0:
-                continue
-            transact_items.append({
-                "Update": {
-                    "TableName": self.table.name,
-                    "Key": {"sku": {"S": sku}},
-                    "UpdateExpression": "SET #stock = #stock - :qty, updated_at = :ts",
-                    "ConditionExpression": "attribute_exists(#stock) AND #stock >= :qty",
-                    "ExpressionAttributeNames": {
-                        "#stock": "stock",
-                    },
-                    "ExpressionAttributeValues": {
-                        ":qty": {"N": str(qty)},
-                        ":ts": {"S": now},
-                    },
+        attempt = 0
+        while attempt < self.MAX_TRANSACT_ATTEMPTS:
+            attempt += 1
+            timestamp = datetime.now(timezone.utc).isoformat()
+            transact_items = self._prepare_transact_items(items, timestamp)
+            if not transact_items:
+                return {"status": "noop"}
+
+            try:
+                response = self.client.transact_write_items(
+                    TransactItems=transact_items,
+                    ReturnConsumedCapacity="TOTAL"
+                )
+                return {
+                    "status": "updated",
+                    "consumed_capacity": response.get("ConsumedCapacity", []),
                 }
-            })
-
-        if not transact_items:
-            return {"status": "noop"}
-
-        try:
-            response = self.client.transact_write_items(
-                TransactItems=transact_items,
-                ReturnConsumedCapacity="TOTAL"
-            )
-            return {
-                "status": "updated",
-                "consumed_capacity": response.get("ConsumedCapacity", []),
-            }
-        except ClientError as exc:
-            code = exc.response.get("Error", {}).get("Code")
-            if code == "ConditionalCheckFailedException":
-                raise OutOfStockError("requested quantity exceeds available stock") from exc
-            raise InventoryStoreError(f"dynamodb transaction failed: {code}") from exc
-        except BotoCoreError as exc:
-            raise InventoryStoreError(f"dynamodb request failed: {exc}") from exc
+            except ClientError as exc:
+                code = exc.response.get("Error", {}).get("Code")
+                if code == "ConditionalCheckFailedException":
+                    if attempt < self.MAX_TRANSACT_ATTEMPTS:
+                        logger.info("Retrying DynamoDB transaction due to conditional failure for %s (attempt %d/%d)",
+                                    ",".join(items.keys()), attempt, self.MAX_TRANSACT_ATTEMPTS)
+                        continue
+                    raise OutOfStockError("requested quantity exceeds available stock") from exc
+                raise InventoryStoreError(f"dynamodb transaction failed: {code}") from exc
+            except BotoCoreError as exc:
+                raise InventoryStoreError(f"dynamodb request failed: {exc}") from exc
 
 
 def aggregate_items(items: List[Item]) -> Dict[str, int]:
@@ -277,7 +376,25 @@ def build_store() -> InventoryStore:
     if DDB_ENDPOINT_URL:
         resource_kwargs["endpoint_url"] = DDB_ENDPOINT_URL
     dynamodb = session.resource("dynamodb", **resource_kwargs)
-    store = DynamoInventoryStore(dynamodb.Table(DDB_TABLE))
+    table = dynamodb.Table(DDB_TABLE)
+    try:
+        table.load()
+    except ClientError as exc:
+        error = exc.response.get("Error", {})
+        if error.get("Code") != "ResourceNotFoundException":
+            raise
+        if not DDB_ENDPOINT_URL:
+            raise
+        logger.info("DynamoDB table %s not found; creating it against %s", DDB_TABLE, DDB_ENDPOINT_URL)
+        table = dynamodb.create_table(
+            TableName=DDB_TABLE,
+            BillingMode="PAY_PER_REQUEST",
+            AttributeDefinitions=[{"AttributeName": "sku", "AttributeType": "S"}],
+            KeySchema=[{"AttributeName": "sku", "KeyType": "HASH"}],
+        )
+        table.wait_until_exists()
+        logger.info("DynamoDB table %s created", DDB_TABLE)
+    store = DynamoInventoryStore(table)
     store.ping()
     logger.info("Using DynamoDB table %s in region %s", DDB_TABLE, AWS_REGION)
     return store

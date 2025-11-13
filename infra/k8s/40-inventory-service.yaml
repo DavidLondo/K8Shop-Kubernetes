@@ -4,7 +4,7 @@ metadata:
   name: inventory-service
   namespace: bookstore
 spec:
-  replicas: 3
+  replicas: 2
   strategy:
     rollingUpdate:
       maxUnavailable: 0
@@ -35,7 +35,7 @@ spec:
                   app: inventory-service
       containers:
       - name: inventory-service
-        image: davidlondo/inventory-service:latest
+        image: davidlondo/inventory-service:v20251108
         ports:
         - containerPort: 8080
           name: http
@@ -78,7 +78,7 @@ spec:
     apiVersion: apps/v1
     kind: Deployment
     name: inventory-service
-  minReplicas: 3
+  minReplicas: 2
   maxReplicas: 10
   metrics:
   - type: Resource
