@@ -80,6 +80,9 @@ from botocore.exceptions import ClientError
 
 AWS_REGION = os.environ.get('AWS_REGION', 'us-east-1')
 DDB_TABLE = os.environ.get('DDB_TABLE', 'bookstore-inventory')
+AWS_ENDPOINT_URL = os.environ.get('DDB_ENDPOINT_URL')
+AWS_ACCESS_KEY_ID = os.environ.get('AWS_ACCESS_KEY_ID')
+AWS_SECRET_ACCESS_KEY = os.environ.get('AWS_SECRET_ACCESS_KEY')
 
 items = [
     {"sku": "BOOK-001", "stock": 45},
@@ -90,9 +93,40 @@ items = [
     {"sku": "BOOK-006", "stock": 22},
 ]
 
-session = boto3.session.Session(region_name=AWS_REGION)
-client = session.client('dynamodb')
+session_kwargs = {"region_name": AWS_REGION}
+if AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY:
+  session_kwargs["aws_access_key_id"] = AWS_ACCESS_KEY_ID
+  session_kwargs["aws_secret_access_key"] = AWS_SECRET_ACCESS_KEY
+
+session = boto3.session.Session(**session_kwargs)
+
+client_kwargs = {}
+if AWS_ENDPOINT_URL:
+  client_kwargs["endpoint_url"] = AWS_ENDPOINT_URL
+if AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY:
+  client_kwargs["aws_access_key_id"] = AWS_ACCESS_KEY_ID
+  client_kwargs["aws_secret_access_key"] = AWS_SECRET_ACCESS_KEY
+
+client = session.client('dynamodb', **client_kwargs)
 ts = datetime.datetime.utcnow().replace(microsecond=0).isoformat() + 'Z'
+
+def ensure_table():
+  try:
+    client.describe_table(TableName=DDB_TABLE)
+  except ClientError as exc:
+    code = exc.response.get('Error', {}).get('Code')
+    if code not in {'ResourceNotFoundException', 'ResourceNotFound'}:
+      raise
+    client.create_table(
+      TableName=DDB_TABLE,
+      KeySchema=[{"AttributeName": "sku", "KeyType": "HASH"}],
+      AttributeDefinitions=[{"AttributeName": "sku", "AttributeType": "S"}],
+      ProvisionedThroughput={"ReadCapacityUnits": 5, "WriteCapacityUnits": 5},
+    )
+    waiter = client.get_waiter('table_exists')
+    waiter.wait(TableName=DDB_TABLE)
+
+ensure_table()
 
 for item in items:
     try:

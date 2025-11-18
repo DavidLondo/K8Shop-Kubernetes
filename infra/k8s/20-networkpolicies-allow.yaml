@@ -29,6 +29,9 @@ spec:
     - namespaceSelector:
         matchLabels:
           kubernetes.io/metadata.name: bookstore
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: istio-system
   egress:
   - to:
     - namespaceSelector:

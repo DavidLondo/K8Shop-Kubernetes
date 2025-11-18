@@ -217,3 +217,5 @@ services/*/build/
 services/*/node_modules/
 services/*/__pycache__/
 services/*/bin/
+
+/istio-1.23.1

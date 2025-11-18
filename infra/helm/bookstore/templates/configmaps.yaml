@@ -51,7 +51,7 @@ data:
   HOST: "0.0.0.0"
   PORT: "8080"
   CART_USE_REDIS: "1"
-  CART_REDIS_SKIP_VERIFY: "1"
+  CART_REDIS_SKIP_VERIFY: "0"
 ---
 apiVersion: v1
 kind: ConfigMap

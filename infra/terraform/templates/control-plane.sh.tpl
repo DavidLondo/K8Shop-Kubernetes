@@ -80,6 +80,12 @@ done
 CONTROL_PLANE_IP="$(curl -s http://169.254.169.254/latest/meta-data/local-ipv4)"
 CONTROL_PLANE_PUBLIC_IP="$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4 || echo "$${CONTROL_PLANE_IP}")"
 CONTROL_PLANE_HOSTNAME="$(hostname -f)"
+API_LB_DNS="${api_lb_dns}"
+
+API_SERVER_SANS="$${CONTROL_PLANE_PUBLIC_IP},$${CONTROL_PLANE_IP},$${CONTROL_PLANE_HOSTNAME}"
+if [[ -n "$${API_LB_DNS}" ]]; then
+  API_SERVER_SANS="$${API_SERVER_SANS},$${API_LB_DNS}"
+fi
 
 kubeadm init \
   --node-name "$${HOSTNAME_PREFIX}-cp" \
@@ -88,7 +94,7 @@ kubeadm init \
   --pod-network-cidr "${pod_network_cidr}" \
   --service-cidr "${service_cidr}" \
   --apiserver-advertise-address "$${CONTROL_PLANE_IP}" \
-  --apiserver-cert-extra-sans "$${CONTROL_PLANE_PUBLIC_IP},$${CONTROL_PLANE_IP},$${CONTROL_PLANE_HOSTNAME}" \
+  --apiserver-cert-extra-sans "$${API_SERVER_SANS}" \
   --control-plane-endpoint "$${CONTROL_PLANE_IP}:6443" \
   --upload-certs
 

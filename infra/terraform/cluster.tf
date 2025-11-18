@@ -111,6 +111,7 @@ resource "aws_instance" "control_plane" {
     kubeadm_token    = local.kubeadm_token
     pod_network_cidr = var.pod_network_cidr
     service_cidr     = var.service_cidr
+    api_lb_dns       = aws_lb.api.dns_name
   })
   user_data_replace_on_change = true
 
@@ -164,7 +165,11 @@ resource "aws_instance" "worker" {
 }
 
 resource "null_resource" "fetch_kubeconfig" {
-  depends_on = [aws_instance.control_plane]
+  depends_on = [
+    aws_instance.control_plane,
+    aws_lb_listener.api,
+    aws_lb_target_group_attachment.api_control_plane
+  ]
 
   triggers = {
     control_plane_id = aws_instance.control_plane.id
@@ -186,8 +191,8 @@ resource "null_resource" "fetch_kubeconfig" {
       until ssh -o StrictHostKeyChecking=no -o BatchMode=yes -o ConnectTimeout=10 -i "$KEY_PATH" ubuntu@${aws_instance.control_plane.public_ip} 'sudo test -s /etc/kubernetes/admin.conf'; do
         sleep 10
       done
-      ssh -o StrictHostKeyChecking=no -i "$KEY_PATH" ubuntu@${aws_instance.control_plane.public_ip} 'sudo cat /etc/kubernetes/admin.conf' > "$KUBECONFIG_PATH"
-      sed -i 's#server: https://.*:6443#server: https://${aws_instance.control_plane.public_ip}:6443#' "$KUBECONFIG_PATH"
+  ssh -o StrictHostKeyChecking=no -i "$KEY_PATH" ubuntu@${aws_instance.control_plane.public_ip} 'sudo cat /etc/kubernetes/admin.conf' > "$KUBECONFIG_PATH"
+  sed -i 's#server: https://.*:6443#server: https://${aws_lb.api.dns_name}:6443#' "$KUBECONFIG_PATH"
       chmod 600 "$KUBECONFIG_PATH"
     EOT
   }

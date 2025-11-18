@@ -64,6 +64,16 @@ output "edge_proxy_load_balancer_zone_id" {
   description = "Hosted zone ID for Route53 alias records pointing to the load balancer."
 }
 
+output "api_load_balancer_dns" {
+  value       = aws_lb.api.dns_name
+  description = "Public DNS name of the Network Load Balancer exposing the Kubernetes API."
+}
+
+output "api_load_balancer_arn" {
+  value       = aws_lb.api.arn
+  description = "ARN of the Network Load Balancer that fronts the Kubernetes API server."
+}
+
 output "kubeconfig_path" {
   value       = var.local_kubeconfig_path
   description = "Local path where Terraform writes the kubeconfig for this cluster."

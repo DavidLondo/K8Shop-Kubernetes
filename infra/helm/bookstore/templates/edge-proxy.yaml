@@ -71,6 +71,38 @@ data:
           add_header Content-Type application/json;
         }
 
+        location = /api/catalog/healthz {
+          proxy_pass http://catalog_upstream/healthz;
+        }
+
+        location = /api/cart/healthz {
+          proxy_pass http://cart_upstream/healthz;
+        }
+
+        location = /api/orders/healthz {
+          proxy_pass http://order_upstream/healthz;
+        }
+
+        location = /api/recommendations/healthz {
+          proxy_pass http://recommendation_upstream/healthz;
+        }
+
+        location = /api/inventory/healthz {
+          proxy_pass http://inventory_upstream/healthz;
+        }
+
+        location = /api/payment/healthz {
+          proxy_pass http://payment_upstream/healthz;
+        }
+
+        location = /api/payments/healthz {
+          proxy_pass http://payment_upstream/healthz;
+        }
+
+        location = /api/notification/healthz {
+          proxy_pass http://notification_upstream/healthz;
+        }
+
         location ~ ^/api/catalog(?<suffix>/?.*)$ {
           proxy_pass http://catalog_upstream/catalog$suffix;
         }

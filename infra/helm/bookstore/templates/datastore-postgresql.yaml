@@ -1,10 +1,5 @@
 {{- if .Values.datastores.postgresql.enabled -}}
 {{- $pg := .Values.credentials.postgres -}}
-{{- $schemasList := list -}}
-{{- range .Values.datastores.postgresql.schemas }}
-{{- $schemasList = append $schemasList (printf "'%s'" .) -}}
-{{- end -}}
-{{- $schemasArray := printf "ARRAY[%s]" (join "," $schemasList) -}}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -21,22 +16,92 @@ data:
       ELSE
         ALTER ROLE {{ $pg.application.username }} LOGIN PASSWORD '{{ $pg.application.password }}';
       END IF;
-      ALTER ROLE {{ $pg.application.username }} SET search_path = public;
+      ALTER ROLE {{ $pg.application.username }} SET search_path = catalog, "order", payment, recommendation, public;
     END $$;
     \connect {{ $pg.superuser.database }};
+    CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+    CREATE SCHEMA IF NOT EXISTS catalog AUTHORIZATION {{ $pg.application.username }};
+    CREATE SCHEMA IF NOT EXISTS "order" AUTHORIZATION {{ $pg.application.username }};
+    CREATE SCHEMA IF NOT EXISTS payment AUTHORIZATION {{ $pg.application.username }};
+    CREATE SCHEMA IF NOT EXISTS recommendation AUTHORIZATION {{ $pg.application.username }};
     DO $$
-    DECLARE
-      schema_name text;
     BEGIN
-      FOR schema_name IN SELECT unnest({{ $schemasArray }})
-      LOOP
-        EXECUTE format('CREATE SCHEMA IF NOT EXISTS %I AUTHORIZATION {{ $pg.superuser.username }};', schema_name);
-        EXECUTE format('GRANT USAGE ON SCHEMA %I TO {{ $pg.application.username }};', schema_name);
-        EXECUTE format('GRANT CREATE ON SCHEMA %I TO {{ $pg.application.username }};', schema_name);
-        EXECUTE format('GRANT CREATE, SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA %I TO {{ $pg.application.username }};', schema_name);
-        EXECUTE format('ALTER DEFAULT PRIVILEGES IN SCHEMA %I GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO {{ $pg.application.username }};', schema_name);
-      END LOOP;
+      IF NOT EXISTS (SELECT FROM pg_tables WHERE schemaname = 'catalog' AND tablename = 'products') THEN
+        CREATE TABLE catalog.products (
+          id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+          sku         text NOT NULL UNIQUE,
+          title       text NOT NULL,
+          description text,
+          price       numeric(10, 2) NOT NULL,
+          image_url   text,
+          tags        text[] NOT NULL DEFAULT ARRAY[]::text[],
+          created_at  timestamptz NOT NULL DEFAULT now(),
+          updated_at  timestamptz NOT NULL DEFAULT now()
+        );
+      END IF;
+      ALTER TABLE catalog.products OWNER TO {{ $pg.application.username }};
+      IF NOT EXISTS (SELECT FROM pg_tables WHERE schemaname = 'catalog' AND tablename = 'product_inventory') THEN
+        CREATE TABLE catalog.product_inventory (
+          product_id uuid PRIMARY KEY REFERENCES catalog.products(id) ON DELETE CASCADE,
+          available  integer NOT NULL DEFAULT 0,
+          updated_at timestamptz NOT NULL DEFAULT now()
+        );
+      END IF;
+      ALTER TABLE catalog.product_inventory OWNER TO {{ $pg.application.username }};
+      IF NOT EXISTS (SELECT FROM pg_tables WHERE schemaname = 'order' AND tablename = 'orders') THEN
+        CREATE TABLE "order".orders (
+          id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+          user_id      text NOT NULL,
+          status       text NOT NULL DEFAULT 'created',
+          total_amount numeric(10, 2) NOT NULL,
+          created_at   timestamptz NOT NULL DEFAULT now()
+        );
+      END IF;
+      ALTER TABLE "order".orders OWNER TO {{ $pg.application.username }};
+      IF NOT EXISTS (SELECT FROM pg_tables WHERE schemaname = 'order' AND tablename = 'order_items') THEN
+        CREATE TABLE "order".order_items (
+          id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+          order_id   uuid NOT NULL REFERENCES "order".orders(id) ON DELETE CASCADE,
+          sku        text NOT NULL,
+          quantity   integer NOT NULL CHECK (quantity > 0),
+          unit_price numeric(10, 2) NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS order_items_order_id_idx ON "order".order_items(order_id);
+      END IF;
+      ALTER TABLE "order".order_items OWNER TO {{ $pg.application.username }};
+      IF NOT EXISTS (SELECT FROM pg_tables WHERE schemaname = 'payment' AND tablename = 'payments') THEN
+        CREATE TABLE payment.payments (
+          id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+          order_id        uuid NOT NULL,
+          status          text NOT NULL,
+          amount          numeric(10, 2) NOT NULL,
+          transaction_ref text,
+          processed_at    timestamptz NOT NULL DEFAULT now()
+        );
+        CREATE UNIQUE INDEX IF NOT EXISTS payment_order_id_idx ON payment.payments(order_id);
+      END IF;
+      ALTER TABLE payment.payments OWNER TO {{ $pg.application.username }};
+      IF NOT EXISTS (SELECT FROM pg_tables WHERE schemaname = 'recommendation' AND tablename = 'recommendation_logs') THEN
+        CREATE TABLE recommendation.recommendation_logs (
+          id         bigserial PRIMARY KEY,
+          product_id text,
+          user_id    text,
+          strategy   text NOT NULL,
+          payload    jsonb NOT NULL DEFAULT '{}'::jsonb,
+          created_at timestamptz NOT NULL DEFAULT now()
+        );
+      END IF;
+      ALTER TABLE recommendation.recommendation_logs OWNER TO {{ $pg.application.username }};
     END $$;
+    GRANT USAGE ON SCHEMA catalog, "order", payment, recommendation TO {{ $pg.application.username }};
+    GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA catalog TO {{ $pg.application.username }};
+    GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA "order" TO {{ $pg.application.username }};
+    GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA payment TO {{ $pg.application.username }};
+    GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA recommendation TO {{ $pg.application.username }};
+    ALTER DEFAULT PRIVILEGES IN SCHEMA catalog GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO {{ $pg.application.username }};
+    ALTER DEFAULT PRIVILEGES IN SCHEMA "order" GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO {{ $pg.application.username }};
+    ALTER DEFAULT PRIVILEGES IN SCHEMA payment GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO {{ $pg.application.username }};
+    ALTER DEFAULT PRIVILEGES IN SCHEMA recommendation GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO {{ $pg.application.username }};
 ---
 apiVersion: apps/v1
 kind: StatefulSet
