@@ -1,0 +1,167 @@
+{{- if .Values.loadGenerator.enabled }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "bookstore.fullname" . }}-load-generator
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "bookstore.labels" . | nindent 4 }}
+    app: load-generator
+data:
+  LOCUST_USERS: {{ .Values.loadGenerator.users | quote }}
+  LOCUST_SPAWN_RATE: {{ .Values.loadGenerator.spawnRate | quote }}
+  LOCUST_HOST: {{ .Values.loadGenerator.host | quote }}
+  {{- if .Values.loadGenerator.runTime }}
+  LOCUST_RUN_TIME: {{ .Values.loadGenerator.runTime | quote }}
+  {{- end }}
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "bookstore.fullname" . }}-load-generator
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "bookstore.labels" . | nindent 4 }}
+    app: load-generator
+    component: {{ .Values.loadGenerator.mode }}
+spec:
+  replicas: {{ .Values.loadGenerator.replicas }}
+  selector:
+    matchLabels:
+      {{- include "bookstore.selectorLabels" . | nindent 6 }}
+      app: load-generator
+      component: {{ .Values.loadGenerator.mode }}
+  template:
+    metadata:
+      labels:
+        {{- include "bookstore.selectorLabels" . | nindent 8 }}
+        app: load-generator
+        component: {{ .Values.loadGenerator.mode }}
+    spec:
+      {{- if eq .Values.loadGenerator.mode "master" }}
+      # Master debe ser singleton, mejor no distribuir por zonas
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              topologyKey: kubernetes.io/hostname
+              labelSelector:
+                matchLabels:
+                  app: load-generator
+                  component: master
+      {{- else if eq .Values.loadGenerator.mode "worker" }}
+      # Workers: distribuir por zonas para alta disponibilidad
+      topologySpreadConstraints:
+      - maxSkew: 1
+        topologyKey: topology.kubernetes.io/zone
+        whenUnsatisfiable: ScheduleAnyway
+        labelSelector:
+          matchLabels:
+            app: load-generator
+            component: worker
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              topologyKey: kubernetes.io/hostname
+              labelSelector:
+                matchLabels:
+                  app: load-generator
+                  component: worker
+      {{- end }}
+      containers:
+      - name: locust
+        image: {{ .Values.loadGenerator.image.repository }}:{{ .Values.loadGenerator.image.tag }}
+        imagePullPolicy: {{ .Values.loadGenerator.image.pullPolicy }}
+        {{- if eq .Values.loadGenerator.mode "master" }}
+        ports:
+        - containerPort: 8089
+          name: web
+          protocol: TCP
+        - containerPort: 5557
+          name: master-bind
+          protocol: TCP
+        {{- end }}
+        envFrom:
+        - configMapRef:
+            name: {{ include "bookstore.fullname" . }}-load-generator
+        {{- if eq .Values.loadGenerator.mode "worker" }}
+        env:
+        - name: LOCUST_MASTER_NODE_HOST
+          value: {{ include "bookstore.fullname" . }}-load-generator
+        - name: LOCUST_MASTER_NODE_PORT
+          value: "5557"
+        {{- end }}
+        resources:
+          {{- toYaml .Values.loadGenerator.resources | nindent 10 }}
+        command:
+        - "locust"
+        args:
+        {{- if eq .Values.loadGenerator.mode "master" }}
+        - "--master"
+        - "--web-port=8089"
+        - "--expect-workers={{ .Values.loadGenerator.workers }}"
+        {{- else if eq .Values.loadGenerator.mode "worker" }}
+        - "--worker"
+        - "--master-host={{ include "bookstore.fullname" . }}-load-generator"
+        - "--master-port=5557"
+        {{- else if eq .Values.loadGenerator.mode "headless" }}
+        - "--headless"
+        - "--users=$(LOCUST_USERS)"
+        - "--spawn-rate=$(LOCUST_SPAWN_RATE)"
+        {{- if .Values.loadGenerator.runTime }}
+        - "--run-time=$(LOCUST_RUN_TIME)"
+        {{- end }}
+        - "--host=$(LOCUST_HOST)"
+        - "--print-stats"
+        {{- end }}
+        {{- if eq .Values.loadGenerator.mode "master" }}
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 8089
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 8089
+          initialDelaySeconds: 10
+          periodSeconds: 5
+        {{- end }}
+
+{{- if eq .Values.loadGenerator.mode "master" }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "bookstore.fullname" . }}-load-generator
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "bookstore.labels" . | nindent 4 }}
+    app: load-generator
+spec:
+  type: {{ .Values.loadGenerator.service.type }}
+  selector:
+    {{- include "bookstore.selectorLabels" . | nindent 4 }}
+    app: load-generator
+    component: master
+  ports:
+  - name: web
+    port: 8089
+    targetPort: 8089
+    protocol: TCP
+    {{- if and (eq .Values.loadGenerator.service.type "NodePort") .Values.loadGenerator.service.nodePort }}
+    nodePort: {{ .Values.loadGenerator.service.nodePort }}
+    {{- end }}
+  - name: master-bind
+    port: 5557
+    targetPort: 5557
+    protocol: TCP
+{{- end }}
+
+{{- end }}

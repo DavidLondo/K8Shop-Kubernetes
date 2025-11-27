@@ -173,3 +173,28 @@ hpa:
 pdb:
   frontendMinAvailable: 1
   servicesMinAvailable: 2
+
+loadGenerator:
+  enabled: false
+  image:
+    repository: davidlondo/k8shop-load-generator
+    tag: latest
+    pullPolicy: IfNotPresent
+  mode: master  # Options: master, worker, headless
+  replicas: 1
+  workers: 0  # Number of expected workers (only for master mode)
+  users: 50
+  spawnRate: 5
+  runTime: ""  # e.g., "10m", "1h" - empty means run indefinitely
+  host: "http://catalog-service.bookstore.svc.cluster.local:8080"
+  service:
+    type: ClusterIP
+    nodePort: null  # Only used if type is NodePort
+  # Recursos ajustados para EC2 t3.large workers en AWS (2 vCPU, 8GB RAM)
+  resources:
+    requests:
+      cpu: 200m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi

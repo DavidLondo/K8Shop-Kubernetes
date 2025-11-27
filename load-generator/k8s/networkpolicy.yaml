@@ -1,0 +1,85 @@
+---
+# NetworkPolicy para permitir tráfico egress del load-generator a todos los servicios
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: load-generator-egress
+  namespace: bookstore
+spec:
+  podSelector:
+    matchLabels:
+      app: load-generator
+  policyTypes:
+  - Egress
+  egress:
+  # Permitir DNS lookups (necesario para resolver service names)
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: kube-system
+    ports:
+    - protocol: UDP
+      port: 53
+  
+  # Permitir tráfico a todos los servicios en el namespace bookstore
+  - to:
+    - podSelector:
+        matchExpressions:
+        - key: app
+          operator: In
+          values:
+          - catalog-service
+          - cart-service
+          - order-service
+          - recommendation-service
+          - payment-service
+          - notification-service
+          - inventory-service
+    ports:
+    - protocol: TCP
+      port: 8080
+    - protocol: TCP
+      port: 50051  # gRPC catalog service
+  
+  # Permitir comunicación entre master y workers de Locust
+  - to:
+    - podSelector:
+        matchLabels:
+          app: load-generator
+    ports:
+    - protocol: TCP
+      port: 5557  # Locust master-worker communication
+    - protocol: TCP
+      port: 8089  # Locust web UI (si workers necesitan reportar)
+
+---
+# NetworkPolicy para permitir ingress al master desde workers
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: load-generator-master-ingress
+  namespace: bookstore
+spec:
+  podSelector:
+    matchLabels:
+      app: load-generator
+      component: master
+  policyTypes:
+  - Ingress
+  ingress:
+  # Permitir tráfico de workers a master
+  - from:
+    - podSelector:
+        matchLabels:
+          app: load-generator
+          component: worker
+    ports:
+    - protocol: TCP
+      port: 5557
+  
+  # Permitir acceso a la UI desde cualquier pod (para port-forward o debugging)
+  - from:
+    - podSelector: {}
+    ports:
+    - protocol: TCP
+      port: 8089
