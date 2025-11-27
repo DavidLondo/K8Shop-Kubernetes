@@ -122,11 +122,13 @@ frontend:
       cpu: 500m
       memory: 256Mi
 
-edgeProxy:
+apisixGateway:
   enabled: true
-  image: nginx:1.27-alpine
+  image: apache/apisix:3.8.0-debian
   replicas: 2
+  listenPort: 80
   nodePort: 30080
+  adminKey: supersecretadminkey
   resources: {}
 
 services:

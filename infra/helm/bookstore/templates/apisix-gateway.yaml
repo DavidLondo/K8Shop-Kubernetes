@@ -1,0 +1,324 @@
+{{- if .Values.apisixGateway.enabled }}
+{{- $ns := .Release.Namespace }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: apisix-gateway-config
+  namespace: {{ $ns }}
+  labels:
+    app: apisix-gateway
+data:
+  config.yaml: |
+    apisix:
+      node_listen: {{ .Values.apisixGateway.listenPort }}
+      enable_admin: true
+      enable_control: false
+      admin_key:
+        - name: admin
+          key: {{ .Values.apisixGateway.adminKey | quote }}
+          role: admin
+      allow_admin:
+        - 127.0.0.1
+    nginx_config:
+      worker_processes: auto
+      worker_rlimit_nofile: 20480
+    deployment:
+      role: data_plane
+      role_data_plane:
+        config_provider: yaml
+  apisix.yaml: |
+    routes:
+      - id: healthz
+        uri: /healthz
+        priority: 100
+        plugins:
+          mocking:
+            response_status: 200
+            response_example: '{"ok":true}'
+            with_mock_header: false
+{{- if .Values.services.catalog.enabled }}
+      - id: catalog-health
+        uri: /api/catalog/healthz
+        methods:
+          - GET
+        priority: 60
+        plugins:
+          proxy-rewrite:
+            uri: /healthz
+        upstream:
+          type: roundrobin
+          pass_host: node
+          nodes:
+            "catalog-service.{{ $ns }}.svc.cluster.local:8080": 1
+      - id: catalog-api
+        uri: /api/catalog*
+        priority: 50
+        plugins:
+          proxy-rewrite:
+            regex_uri:
+              - ^/api/catalog(.*)
+              - /catalog$1
+        upstream:
+          type: roundrobin
+          pass_host: node
+          nodes:
+            "catalog-service.{{ $ns }}.svc.cluster.local:8080": 1
+{{- end }}
+{{- if .Values.services.cart.enabled }}
+      - id: cart-health
+        uri: /api/cart/healthz
+        methods:
+          - GET
+        priority: 60
+        plugins:
+          proxy-rewrite:
+            uri: /healthz
+        upstream:
+          type: roundrobin
+          pass_host: node
+          nodes:
+            "cart-service.{{ $ns }}.svc.cluster.local:8080": 1
+      - id: cart-api
+        uri: /api/cart*
+        priority: 50
+        plugins:
+          proxy-rewrite:
+            regex_uri:
+              - ^/api/cart(.*)
+              - /cart$1
+        upstream:
+          type: roundrobin
+          pass_host: node
+          nodes:
+            "cart-service.{{ $ns }}.svc.cluster.local:8080": 1
+{{- end }}
+{{- if .Values.services.order.enabled }}
+      - id: order-health
+        uri: /api/orders/healthz
+        methods:
+          - GET
+        priority: 60
+        plugins:
+          proxy-rewrite:
+            uri: /healthz
+        upstream:
+          type: roundrobin
+          pass_host: node
+          nodes:
+            "order-service.{{ $ns }}.svc.cluster.local:8000": 1
+      - id: order-api
+        uri: /api/orders*
+        priority: 50
+        plugins:
+          proxy-rewrite:
+            regex_uri:
+              - ^/api/orders(.*)
+              - /orders$1
+        upstream:
+          type: roundrobin
+          pass_host: node
+          nodes:
+            "order-service.{{ $ns }}.svc.cluster.local:8000": 1
+{{- end }}
+{{- if .Values.services.recommendation.enabled }}
+      - id: recommendation-health
+        uri: /api/recommendations/healthz
+        methods:
+          - GET
+        priority: 60
+        plugins:
+          proxy-rewrite:
+            uri: /healthz
+        upstream:
+          type: roundrobin
+          pass_host: node
+          nodes:
+            "recommendation-service.{{ $ns }}.svc.cluster.local:8080": 1
+      - id: recommendation-api
+        uri: /api/recommendations*
+        priority: 50
+        plugins:
+          proxy-rewrite:
+            regex_uri:
+              - ^/api/recommendations(.*)
+              - /recommendations$1
+        upstream:
+          type: roundrobin
+          pass_host: node
+          nodes:
+            "recommendation-service.{{ $ns }}.svc.cluster.local:8080": 1
+{{- end }}
+{{- if .Values.services.inventory.enabled }}
+      - id: inventory-health
+        uri: /api/inventory/healthz
+        methods:
+          - GET
+        priority: 60
+        plugins:
+          proxy-rewrite:
+            uri: /healthz
+        upstream:
+          type: roundrobin
+          pass_host: node
+          nodes:
+            "inventory-service.{{ $ns }}.svc.cluster.local:8080": 1
+      - id: inventory-api
+        uri: /api/inventory*
+        priority: 50
+        plugins:
+          proxy-rewrite:
+            regex_uri:
+              - ^/api/inventory(.*)
+              - /inventory$1
+        upstream:
+          type: roundrobin
+          pass_host: node
+          nodes:
+            "inventory-service.{{ $ns }}.svc.cluster.local:8080": 1
+{{- end }}
+{{- if .Values.services.payment.enabled }}
+      - id: payment-health
+        uris:
+          - /api/payment/healthz
+          - /api/payments/healthz
+        methods:
+          - GET
+        priority: 60
+        plugins:
+          proxy-rewrite:
+            uri: /healthz
+        upstream:
+          type: roundrobin
+          pass_host: node
+          nodes:
+            "payment-service.{{ $ns }}.svc.cluster.local:8080": 1
+      - id: payment-api
+        uris:
+          - /api/payment*
+          - /api/payments*
+        priority: 50
+        plugins:
+          proxy-rewrite:
+            regex_uri:
+              - ^/api/payments?(.*)
+              - /payments$1
+        upstream:
+          type: roundrobin
+          pass_host: node
+          nodes:
+            "payment-service.{{ $ns }}.svc.cluster.local:8080": 1
+{{- end }}
+{{- if .Values.services.notification.enabled }}
+      - id: notification-health
+        uri: /api/notification/healthz
+        methods:
+          - GET
+        priority: 60
+        plugins:
+          proxy-rewrite:
+            uri: /healthz
+        upstream:
+          type: roundrobin
+          pass_host: rewrite
+          upstream_host: "notification-service.{{ $ns }}.svc.cluster.local"
+          nodes:
+            "notification-service.{{ $ns }}.svc.cluster.local:8080": 1
+      - id: notification-api
+        uri: /api/notification*
+        priority: 50
+        plugins:
+          proxy-rewrite:
+            regex_uri:
+              - ^/api/notification(.*)
+              - /notification$1
+        upstream:
+          type: roundrobin
+          pass_host: rewrite
+          upstream_host: "notification-service.{{ $ns }}.svc.cluster.local"
+          nodes:
+            "notification-service.{{ $ns }}.svc.cluster.local:8080": 1
+{{- end }}
+      - id: frontend
+        uri: /*
+        priority: 1
+        upstream:
+          type: roundrobin
+          pass_host: rewrite
+          upstream_host: "frontend.{{ $ns }}.svc.cluster.local"
+          nodes:
+            "frontend.{{ $ns }}.svc.cluster.local:80": 1
+{{ printf "#END" | nindent 4 }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: apisix-gateway
+  namespace: {{ $ns }}
+  labels:
+    app: apisix-gateway
+spec:
+  replicas: {{ .Values.apisixGateway.replicas }}
+  selector:
+    matchLabels:
+      app: apisix-gateway
+  template:
+    metadata:
+      labels:
+        app: apisix-gateway
+    spec:
+      {{- with .Values.global.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.global.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: apisix
+          image: {{ .Values.apisixGateway.image }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          env:
+            - name: APISIX_STANDALONE
+              value: "1"
+          ports:
+            - containerPort: {{ .Values.apisixGateway.listenPort }}
+              name: http
+          volumeMounts:
+            - name: apisix-conf
+              mountPath: /usr/local/apisix/conf/config.yaml
+              subPath: config.yaml
+            - name: apisix-conf
+              mountPath: /usr/local/apisix/conf/apisix.yaml
+              subPath: apisix.yaml
+          readinessProbe:
+            tcpSocket:
+              port: {{ .Values.apisixGateway.listenPort }}
+            initialDelaySeconds: 5
+          livenessProbe:
+            tcpSocket:
+              port: {{ .Values.apisixGateway.listenPort }}
+            initialDelaySeconds: 10
+          resources: {{- toYaml .Values.apisixGateway.resources | nindent 12 }}
+      volumes:
+        - name: apisix-conf
+          configMap:
+            name: apisix-gateway-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: apisix-gateway
+  namespace: {{ $ns }}
+  labels:
+    app: apisix-gateway
+spec:
+  selector:
+    app: apisix-gateway
+  type: NodePort
+  ports:
+    - name: http
+      port: 80
+      targetPort: {{ .Values.apisixGateway.listenPort }}
+      nodePort: {{ .Values.apisixGateway.nodePort }}
+{{- end }}
